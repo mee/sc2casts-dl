@@ -20,7 +20,6 @@ main = do
   putStrLn "Starting Feed"
   rsp <- Network.HTTP.simpleHTTP (getRequest "http://sc2casts.com/rss")
   body <- getResponseBody rsp
-  -- ok to here
   let feed = parseFeedString body
   let items = maybe ([newItem . RSSKind . Just $ "fail"]) feedItems feed
   selections <- selectFromItems items
@@ -28,7 +27,7 @@ main = do
   _ <- fetchItems selections
   return ()
 
--- selectFromItems :: [Items] -> IO [Items]
+selectFromItems :: [Item] -> IO [Item]
 selectFromItems items = do
   let enumItems = zip [1..] items
   displayItems enumItems
@@ -51,13 +50,13 @@ displayItems ei = let strs =  map (\(n,i) -> (show n) ++ ":  " ++ (maybe "N/A" i
       hFlush stdout
       return ()
 
--- for each item, fetch and html at itemLink
--- parse out any youtube links
--- pass them to youtube-dl
--- fetchItems :: [Items] -> IO ()
-fetchItems [] = do return ()
-fetchItems (i:is) = let itemLink = fromMaybe "" (getItemLink i)
-                        itemTitle = fromMaybe "" (getItemTitle i) in
+fetchItems :: [Item] -> IO ()
+fetchItems is = do _ <- sequence $ map fetchItem is
+                   return ()
+
+fetchItem :: Item -> IO ()
+fetchItem i = let itemLink = fromMaybe "" (getItemLink i)
+                  itemTitle = fromMaybe "" (getItemTitle i) in
    do rsp <- Network.HTTP.simpleHTTP (getRequest itemLink)
       body <- getResponseBody rsp
       let links = getLinks body
@@ -66,9 +65,7 @@ fetchItems (i:is) = let itemLink = fromMaybe "" (getItemLink i)
 
 -- pull youtube links from HTML text
 {- example:
-<div class="series_view">
-...
-<embed src="http://www.youtube.com/v/wXcIqfsYveE?fs=1&amp;hl=en_US" type="application/x-shockwave-flash" allowfullscreen="true" width="640" height="385">
+<div class="series_view"> ... <embed src="http://www.youtube.com/v/wXcIqfsYveE?fs=1&amp;hl=en_US" type="application/x-shockwave-flash" allowfullscreen="true" width="640" height="385"> ... </div>
 -}
 
 getLinks :: String -> [String]
@@ -89,5 +86,5 @@ findEmbedSrcLinks el = map getSrcLink embedEls where
   getSrcLink :: Element -> String
   getSrcLink el' = attrVal . head $ filter (\attr -> (qName . attrKey $ attr) == "src") (elAttribs el')
 
--- saveVODs :: [String] -> IO ()
+saveVODs :: [String] -> IO [()]
 saveVODs ss = sequence $ map (\s -> rawSystem "youtube-dl" ["-t", "-q", s] >> return ()) ss
