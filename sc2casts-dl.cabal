@@ -48,7 +48,7 @@ Executable sc2casts-dl
   Main-is:             Main.hs
   
   -- Packages needed in order to build this package.
-  Build-depends:       HTTP, feed, haskell2010, process, xml
+  Build-depends:       HTTP, feed, haskell2010, process, xml, zlib, bytestring, network, MissingH
   
   -- Modules not exported by this package.
   -- Other-modules:       
