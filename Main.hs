@@ -80,7 +80,7 @@ parseFetchResponse s = map read (words s)
 -- make prettier
 displayItems :: [(Integer,Item)] -> IO ()
 displayItems ei = let strs =  map (\(n,i) -> show n ++ ":  " ++ fromMaybe "N/A" (getItemTitle i) ++ "\n\t" ++ fromMaybe "N/A" (getItemDescription i) ++ "\n") ei in
-   do mapM putStr strs
+   do mapM_ putStr strs
       hFlush stdout
       return ()
 
