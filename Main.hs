@@ -3,23 +3,16 @@ module Main where
 import Codec.Compression.GZip (decompress)
 import Control.Monad (liftM)
 import Data.Bits.Utils (s2w8, w82s)
-import Data.ByteString.Internal (ByteString)
 import Data.List (isInfixOf, any)
 import Data.Maybe
-import Network.BufferType
 import Network.HTTP
-import Network.HTTP.Headers
-import Network.Stream (Result)
 import Network.URI
 import System.Cmd
 import System.IO
-import Text.Atom.Feed
-import Text.Feed.Constructor
 import Text.Feed.Import
 import Text.Feed.Query
 import Text.Feed.Types
 import Text.XML.Light
-import qualified Data.ByteString.Char8 as B (pack, unpack)
 import qualified Data.ByteString.Lazy as BL
 
 {- Example item:
@@ -28,8 +21,19 @@ import qualified Data.ByteString.Lazy as BL
 
 main :: IO ()
 main = do
+  body <- getFeedBody
+
+  let items = maybe [] feedItems (parseFeedString body)
+  putStrLn $ "Found " ++ (show . length $ items) ++ " items."
+  selections <- selectFromItems items
+
+  putStr $ "Fetching: " ++ (seq selections (show . length $ selections)) ++ " Items..."
+  hFlush stdout
+  mapM_ fetchItem selections
+  putStrLn "Finished."
+
+getFeedBody = do
   putStr "Fetching Feed..."
-  
   let myURI = URIAuth { uriUserInfo = ""
                       , uriRegName = "sc2casts.com"
                       , uriPort = ":80" }
@@ -42,23 +46,15 @@ main = do
   result <- Network.HTTP.simpleHTTP myReq
   let response = either (\_ -> error "Connection Error") id result
   rawResponse <- getResponseBody result
-  
+
   -- is the response gzip encoded?
   let myResultHeaders = (map hdrValue (retrieveHeaders HdrContentEncoding response))
   let body = if any (isInfixOf "gzip") myResultHeaders then
                decompressString rawResponse else
                rawResponse where
                  decompressString = w82s . BL.unpack . decompress . BL.pack . s2w8
-
   putStrLn "Done."
-  let feed = parseFeedString body
-  let items = maybe [newItem . RSSKind . Just $ "fail"] feedItems feed
-  let numItems = length items    
-  putStrLn $ "Found " ++ show numItems ++ " items."
-  selections <- selectFromItems items
-  putStr $ "Fetching: " ++ (show . length $ selections) ++ " Items..."
-  _ <- fetchItems selections
-  return ()
+  return body
 
 selectFromItems :: [Item] -> IO [Item]
 selectFromItems items | null items = return []
@@ -84,19 +80,15 @@ displayItems ei = let strs =  map (\(n,i) -> show n ++ ":  " ++ fromMaybe "N/A" 
       hFlush stdout
       return ()
 
-fetchItems :: [Item] -> IO ()
-fetchItems is = do _ <- mapM fetchItem is
-                   putStrLn "Done."
-                   return ()
-
 fetchItem :: Item -> IO ()
 fetchItem i = let itemLink = fromMaybe "" (getItemLink i)
                   itemTitle = fromMaybe "" (getItemTitle i) in
-   do rsp <- Network.HTTP.simpleHTTP (getRequest itemLink)
+   do putStr $ "Fetching " ++ itemTitle ++ "..."
+      rsp <- Network.HTTP.simpleHTTP (getRequest itemLink)
       body <- getResponseBody rsp
       let links = getLinks body
       _ <- saveVODs links
-      return ()
+      putStrLn "Done"
 
 -- pull youtube links from HTML text
 {- example:
