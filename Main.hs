@@ -29,7 +29,7 @@ main = do
   selections <- selectFromItems items
 
   putStrLn $ "Fetching " ++ (show . length $ selections) ++
-    " Item" ++ (if length selections > 1 then "s." else ".")
+    " Item" ++ (if length selections == 1 then "." else "s.")
   hFlush stdout
   mapM_ fetchItem selections
   putStrLn "Finished."
@@ -102,7 +102,7 @@ fetchItem i = let itemLink = fromMaybe "" (getItemLink i)
       rsp <- Network.HTTP.simpleHTTP (getRequest itemLink)
       body <- getResponseBody rsp
       let links = getLinks body
-      _ <- saveVODs links
+      _ <- saveVODs itemTitle links
       putStrLn "Done."
 
 -- pull youtube links from HTML text
@@ -128,7 +128,5 @@ findEmbedSrcLinks el = map getSrcLink embedEls where
   getSrcLink :: Element -> String
   getSrcLink el' = attrVal . head $ filter (\attr -> (qName . attrKey $ attr) == "src") (elAttribs el')
 
--- this should put them in a directory and create a playlist, so you
--- can watch them without knowing how many games there are
-saveVODs :: [String] -> IO [()]
-saveVODs ss = mapM (\s -> rawSystem "youtube-dl" ["-t", "-q", s] >> return ()) ss
+saveVODs :: String -> [String] -> IO ()
+saveVODs it ss = mapM_ (\s -> rawSystem "youtube-dl" ["-o", it ++ "/%(title)s.%(ext)s", "-q", "-w", s]) ss

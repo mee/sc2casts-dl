@@ -74,7 +74,9 @@ Example use:
 	Fetching SlayerS_Brown vs Unknown Player (1 Game)...Done.
 	Finished.
 
-	$ ls *.mp4
-	NaNiwa_P_v_WhiteRa_P_G1_from_IEM_Kiev-vttMC9hcHUw.mp4  SlayerS_Brown_vs_뽀통령_PvT-l9uMKBnmmos.mp4
-	NaNiwa_P_v_WhiteRa_P_G2_from_IEM_Kiev-TmCnSyrg76s.mp4
+The files will be downloaded into folders named after the item title
+("Naniwa vs WhiteRa (Best of 3)" and "SlayerS_Brown vs Unknown Player
+(1 Game)" above) in the current working directory. You can now play
+them without knowing how many actual games there are in the series,
 
+	$ mplayer Naniwa\ vs\ WhiteRa\ \(Best of 3\)/*
