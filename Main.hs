@@ -3,6 +3,7 @@ module Main where
 import Codec.Compression.GZip (decompress)
 import Control.Monad (liftM)
 import Data.Bits.Utils (s2w8, w82s)
+import Data.Char (isDigit)
 import Data.List (isInfixOf, any)
 import Data.Maybe
 import Network.HTTP
@@ -27,11 +28,13 @@ main = do
   putStrLn $ "Found " ++ (show . length $ items) ++ " items."
   selections <- selectFromItems items
 
-  putStr $ "Fetching: " ++ (seq selections (show . length $ selections)) ++ " Items..."
+  putStrLn $ "Fetching " ++ (show . length $ selections) ++
+    " Item" ++ (if length selections > 1 then "s." else ".")
   hFlush stdout
   mapM_ fetchItem selections
   putStrLn "Finished."
 
+getFeedBody :: IO String
 getFeedBody = do
   putStr "Fetching Feed..."
   let myURI = URIAuth { uriUserInfo = ""
@@ -64,31 +67,43 @@ selectFromItems items | null items = return []
   putStr "Fetch: "
   hFlush stdout
   toFetch <- getLine
-  let toFetchNums = parseFetchResponse toFetch
+  let toFetchNums = parseFetchResponse (map fst enumItems) toFetch
   return [ i | (n,i) <- enumItems
              , tf <- toFetchNums
              , n == tf ]
 
--- "1 2 3 14" -> [1,2,3,14]
-parseFetchResponse :: String -> [Integer]
-parseFetchResponse s = map read (words s)
+parseFetchResponse :: [Integer] -> String -> [Integer]
+parseFetchResponse l s = filter isValid $ map safeRead (words s)
+  where safeRead w = if all isDigit w then read w else 0
+        isValid n = and [ n `elem` l, n > 0 ]
+
+prop_parseFetchResponse :: [Integer] -> Bool
+prop_parseFetchResponse x = parseFetchResponse x (unwords $ map show x) == filter (>0) x
 
 -- make prettier
 displayItems :: [(Integer,Item)] -> IO ()
-displayItems ei = let strs =  map (\(n,i) -> show n ++ ":  " ++ fromMaybe "N/A" (getItemTitle i) ++ "\n\t" ++ fromMaybe "N/A" (getItemDescription i) ++ "\n") ei in
-   do mapM_ putStr strs
-      hFlush stdout
-      return ()
+displayItems ei = let numColumns = succ . length . show . maximum $ map fst ei
+                      pad n s = if length s < n
+                                then (s ++ (concat $ take (n - length s) $ repeat " "))
+                                else s
+                      strs = map (\(n,i) -> pad (numColumns+1) (show n ++ ":") ++
+                                            fromMaybe "N/A" (getItemTitle i) ++ "\n" ++
+                                            (pad (numColumns+2) "") ++
+                                            fromMaybe "N/A" (getItemDescription i) ++ "\n") ei in
+                  do mapM_ putStr strs
+                     hFlush stdout
+                     return ()
 
 fetchItem :: Item -> IO ()
 fetchItem i = let itemLink = fromMaybe "" (getItemLink i)
                   itemTitle = fromMaybe "" (getItemTitle i) in
    do putStr $ "Fetching " ++ itemTitle ++ "..."
+      hFlush stdout
       rsp <- Network.HTTP.simpleHTTP (getRequest itemLink)
       body <- getResponseBody rsp
       let links = getLinks body
       _ <- saveVODs links
-      putStrLn "Done"
+      putStrLn "Done."
 
 -- pull youtube links from HTML text
 {- example:
@@ -113,5 +128,7 @@ findEmbedSrcLinks el = map getSrcLink embedEls where
   getSrcLink :: Element -> String
   getSrcLink el' = attrVal . head $ filter (\attr -> (qName . attrKey $ attr) == "src") (elAttribs el')
 
+-- this should put them in a directory and create a playlist, so you
+-- can watch them without knowing how many games there are
 saveVODs :: [String] -> IO [()]
 saveVODs ss = mapM (\s -> rawSystem "youtube-dl" ["-t", "-q", s] >> return ()) ss
