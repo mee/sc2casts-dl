@@ -8,9 +8,9 @@ Building Instructions:
 
 Install Cabal/Haskell Platform and youtube-dl, then
 
-$ cabal configure
-$ cabal build
-$ dist/build/sc2casts-dl/sc2casts-dl
+	$ cabal configure
+	$ cabal build
+	$ dist/build/sc2casts-dl/sc2casts-dl
 
 Example use:
 ------------
